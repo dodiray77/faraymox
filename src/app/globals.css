@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #020617;
+  --foreground: #e2e8f0;
+}
+
+html.light {
+  --background: #f1f5f9;
+  --foreground: #0f172a;
 }
 
 @theme inline {
@@ -12,15 +17,139 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(51 65 85) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgb(51 65 85);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Sentinel utilities */
+.glass {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+html.light .glass {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.04) inset,
+    0 8px 32px -12px rgba(15, 23, 42, 0.15);
+}
+.card-ring {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 8px 32px -12px rgba(0, 0, 0, 0.6);
+}
+html.light .card-ring {
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.06) inset,
+    0 8px 32px -12px rgba(15, 23, 42, 0.12);
+}
+.text-gradient {
+  background: linear-gradient(135deg, #fff 30%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+html.light .text-gradient {
+  background: linear-gradient(135deg, #0f172a 30%, #475569 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+html.light .text-white {
+  color: rgb(15 23 42) !important;
+}
+html.light .text-slate-200 {
+  color: rgb(30 41 59) !important;
+}
+html.light .text-slate-300 {
+  color: rgb(51 65 85) !important;
+}
+html.light .text-slate-400 {
+  color: rgb(100 116 139) !important;
+}
+html.light .text-slate-500 {
+  color: rgb(100 116 139) !important;
+}
+html.light .border-white\/10,
+html.light .border-white\/8 {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+html.light .bg-slate-950,
+html.light .bg-slate-950\/70,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-950\/80\! {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+html.light .bg-slate-900\/60\!,
+html.light .bg-slate-900\/40,
+html.light [class*="bg-slate-900"] {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+html.light [class*="bg-slate-950"] {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+html.light [class*="border-white"] {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+html.light [class*="text-white"] {
+  color: rgb(15 23 42) !important;
+}
+html.light .bg-white\/5 {
+  background-color: rgba(15, 23, 42, 0.04) !important;
+}
+html.light .bg-white\/5\!,
+html.light .bg-white\/\[0\.04\] {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+html.light .text-slate-100 {
+  color: rgb(15 23 42) !important;
+}
+html.light .backdrop-blur-xl {
+  backdrop-filter: blur(12px);
+}
+.animate-fade-up {
+  animation: fadeUp 0.5s ease-out both;
+}
+.stagger-1 {
+  animation-delay: 0.05s;
+}
+.stagger-2 {
+  animation-delay: 0.1s;
+}
+.stagger-3 {
+  animation-delay: 0.15s;
+}
+.stagger-4 {
+  animation-delay: 0.2s;
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
