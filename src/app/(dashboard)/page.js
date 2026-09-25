@@ -31,7 +31,9 @@ function StatusBadge({ status }) {
           : "border-rose-500/25 bg-rose-500/10 text-rose-300"
       }`}
     >
-      <span className={`size-1.5 rounded-full ${online ? "bg-emerald-400 animate-pulse" : "bg-rose-400"}`} />
+      <span
+        className={`size-1.5 rounded-full ${online ? "bg-emerald-400 animate-pulse" : "bg-rose-400"}`}
+      />
       {online ? "Online" : "Offline"}
     </span>
   );
@@ -66,20 +68,30 @@ function DeviceCard({ device, delay = "" }) {
           </div>
         </Card.Caption>
         <Card.Content className="flex-1">
-          <h3 className="mt-4 truncate text-[15px] font-extrabold tracking-tight text-white">{device.name}</h3>
-          <p className="mt-0.5 truncate text-xs font-medium text-slate-400">{device.model}</p>
+          <h3 className="mt-4 truncate text-[15px] font-extrabold tracking-tight text-white">
+            {device.name}
+          </h3>
+          <p className="mt-0.5 truncate text-xs font-medium text-slate-400">
+            {device.model}
+          </p>
           <div className="mt-3 space-y-2 border-t border-white/8 pt-3 font-mono text-xs">
             <div className="flex items-center justify-between gap-2">
               <span className="text-slate-500">IP</span>
-              <span className="font-semibold tracking-tight text-slate-200">{device.ip}</span>
+              <span className="font-semibold tracking-tight text-slate-200">
+                {device.ip}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-2">
               <span className="text-slate-500">MAC</span>
-              <span className="truncate font-semibold text-slate-300">{device.mac}</span>
+              <span className="truncate font-semibold text-slate-300">
+                {device.mac}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-2">
               <span className="text-slate-500">Lokasi</span>
-              <span className="truncate font-sans text-[12px] font-semibold text-slate-300">{device.location}</span>
+              <span className="truncate font-sans text-[12px] font-semibold text-slate-300">
+                {device.location}
+              </span>
             </div>
           </div>
         </Card.Content>
@@ -87,7 +99,9 @@ function DeviceCard({ device, delay = "" }) {
           <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold tracking-tight text-slate-400">
             {device.version}
           </span>
-          <span className="text-[11px] font-bold text-slate-500 group-hover:text-emerald-300 transition-colors">Buka →</span>
+          <span className="text-[11px] font-bold text-slate-500 group-hover:text-emerald-300 transition-colors">
+            Buka →
+          </span>
         </Card.Footer>
       </Card.Body>
     </Card.Root>
@@ -117,7 +131,8 @@ function GroupSection({ type, items }) {
             </span>
           </h2>
           <p className="truncate text-xs text-slate-500">
-            {meta.desc} · {online}/{items.length} aktif · klik kartu untuk buka {meta.label}
+            {meta.desc} · {online}/{items.length} aktif · klik kartu untuk buka{" "}
+            {meta.label}
           </p>
         </div>
       </div>
@@ -126,8 +141,12 @@ function GroupSection({ type, items }) {
           <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-white/5 border border-white/10 text-slate-500">
             <Icon className="size-5" />
           </div>
-          <p className="mt-3 text-sm font-semibold text-slate-300">Tidak ada perangkat</p>
-          <p className="text-xs text-slate-500">Tidak ada {meta.label.toLowerCase()} yang cocok dengan filter.</p>
+          <p className="mt-3 text-sm font-semibold text-slate-300">
+            Tidak ada perangkat
+          </p>
+          <p className="text-xs text-slate-500">
+            Tidak ada {meta.label.toLowerCase()} yang cocok dengan filter.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -135,7 +154,13 @@ function GroupSection({ type, items }) {
             <DeviceCard
               key={d.id}
               device={d}
-              delay={i % 3 === 0 ? "stagger-1" : i % 3 === 1 ? "stagger-2" : "stagger-3"}
+              delay={
+                i % 3 === 0
+                  ? "stagger-1"
+                  : i % 3 === 1
+                    ? "stagger-2"
+                    : "stagger-3"
+              }
             />
           ))}
         </div>
@@ -145,10 +170,30 @@ function GroupSection({ type, items }) {
 }
 
 const STATS = [
-  { key: "total", label: "Total Perangkat", tone: "from-violet-400 to-indigo-600 shadow-indigo-500/25", icon: Server },
-  { key: "router", label: "Router", tone: "from-emerald-400 to-teal-600 shadow-emerald-500/25", icon: Sitemap },
-  { key: "proxmox", label: "Proxmox / VM", tone: "from-violet-400 to-indigo-600 shadow-violet-500/25", icon: Server },
-  { key: "docker", label: "Docker", tone: "from-cyan-400 to-sky-600 shadow-cyan-500/25", icon: Desktop },
+  {
+    key: "total",
+    label: "Total Perangkat",
+    tone: "from-violet-400 to-indigo-600 shadow-indigo-500/25",
+    icon: Server,
+  },
+  {
+    key: "router",
+    label: "Router",
+    tone: "from-emerald-400 to-teal-600 shadow-emerald-500/25",
+    icon: Sitemap,
+  },
+  {
+    key: "proxmox",
+    label: "Proxmox / VM",
+    tone: "from-violet-400 to-indigo-600 shadow-violet-500/25",
+    icon: Server,
+  },
+  {
+    key: "docker",
+    label: "Docker",
+    tone: "from-cyan-400 to-sky-600 shadow-cyan-500/25",
+    icon: Desktop,
+  },
 ];
 
 export default function Dashboard() {
@@ -200,7 +245,9 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="text-gradient text-2xl font-extrabold tracking-tight md:text-[28px]">Perangkat</h1>
+              <h1 className="text-gradient text-2xl font-extrabold tracking-tight md:text-[28px]">
+                Perangkat
+              </h1>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold leading-none text-emerald-300">
                 <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 {counts.online}/{counts.total} Online
@@ -212,7 +259,8 @@ export default function Dashboard() {
               )}
             </div>
             <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-slate-400">
-              3 grup: Router MikroTik · Proxmox / VM · Docker. Klik kartu untuk buka halaman sesuai jenis.
+              3 grup: Router MikroTik · Proxmox / VM · Docker. Klik kartu untuk
+              buka halaman sesuai jenis.
             </p>
           </div>
           {query && (
@@ -236,14 +284,22 @@ export default function Dashboard() {
                 <div
                   className={`flex size-10 items-center justify-center rounded-xl bg-linear-to-br ${s.tone} text-slate-950 shadow-lg transition-transform group-hover:scale-105 [&_svg]:size-5`}
                 >
-                  {Icon ? <Icon /> : <span className="size-2.5 rounded-full bg-white" />}
+                  {Icon ? (
+                    <Icon />
+                  ) : (
+                    <span className="size-2.5 rounded-full bg-white" />
+                  )}
                 </div>
                 <span
                   className={`hidden sm:inline-flex size-2 rounded-full ${s.key === "online" ? "bg-emerald-400 animate-pulse" : s.key === "router" ? "bg-emerald-400/60" : s.key === "proxmox" ? "bg-violet-400/60" : s.key === "docker" ? "bg-cyan-400/60" : "bg-indigo-400/60"}`}
                 />
               </div>
-              <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">{s.label}</p>
-              <p className="mt-1 font-mono text-[28px] font-extrabold leading-none tracking-tight text-white">{value}</p>
+              <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                {s.label}
+              </p>
+              <p className="mt-1 font-mono text-[28px] font-extrabold leading-none tracking-tight text-white">
+                {value}
+              </p>
               <p className="mt-1 text-xs text-slate-500">
                 {s.key === "online"
                   ? `${counts.offline} offline`
@@ -291,7 +347,9 @@ export default function Dashboard() {
               {t.label}
               <span
                 className={`rounded-full px-1.5 py-0.5 text-[10px] font-extrabold leading-none ${
-                  tab === t.value ? "bg-emerald-500/20 text-emerald-200" : "bg-white/10 text-slate-400"
+                  tab === t.value
+                    ? "bg-emerald-500/20 text-emerald-200"
+                    : "bg-white/10 text-slate-400"
                 }`}
               >
                 {t.count}
@@ -302,13 +360,20 @@ export default function Dashboard() {
       </div>
 
       <div className="space-y-8">
-        {(tab === "all" || tab === "router") && <GroupSection type="router" items={groups.router} />}
-        {(tab === "all" || tab === "proxmox") && <GroupSection type="proxmox" items={groups.proxmox} />}
-        {(tab === "all" || tab === "docker") && <GroupSection type="docker" items={groups.docker} />}
+        {(tab === "all" || tab === "router") && (
+          <GroupSection type="router" items={groups.router} />
+        )}
+        {(tab === "all" || tab === "proxmox") && (
+          <GroupSection type="proxmox" items={groups.proxmox} />
+        )}
+        {(tab === "all" || tab === "docker") && (
+          <GroupSection type="docker" items={groups.docker} />
+        )}
       </div>
 
       <p className="pb-2 text-center text-[11px] font-medium tracking-wide text-slate-600">
-        3 grup aktif · Klik Router → /mikrotik · Proxmox/VM → /proxmox · Docker → /docker
+        3 grup aktif · Klik Router → /mikrotik · Proxmox/VM → /proxmox · Docker
+        → /docker
       </p>
     </div>
   );

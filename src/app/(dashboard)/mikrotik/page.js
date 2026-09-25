@@ -34,7 +34,17 @@ import { Select } from "@primereact/ui/select";
 import useSWR from "swr";
 import { useMemo, useRef, useState } from "react";
 
-ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, Title, Filler);
+ChartJS.register(
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Filler,
+);
 
 const fetcher = (u) => fetch(u).then((r) => r.json());
 
@@ -75,8 +85,28 @@ function StatShell({ children, delay = "" }) {
 }
 
 const toMbps = (bits) => Number((Number(bits || 0) / 1000000).toFixed(2));
+
+async function getRouterResource() {
+  // Gunakan URL absolut saat mengambil data di dalam Server Component
+  const res = await fetch("http://localhost:3000/api/mikrotik", {
+    cache: "no-store", // Memastikan data selalu fresh dari MikroTik setiap kali halaman dibuka
+  });
+
+  if (!res.ok) {
+    throw new Error("Gagal mengambil data dari API MikroTik");
+  }
+
+  return res.json();
+}
 export default function MikroTikPage() {
-  const [systemInfo, setSystemInfo] = useState({
+  const { data, isLoading, error } = useSWR(
+    "/api/mikrotik/?resource=resource",
+    fetcher,
+    {
+      refreshInterval: 5000,
+    },
+  );
+  let systemInfo = data?.data[0] || {
     uptime: "0s",
     version: "—",
     "build-time": "",
@@ -92,7 +122,8 @@ export default function MikroTikPage() {
     "architecture-name": "-",
     "board-name": "Menghubungkan…",
     platform: "-",
-  });
+  };
+
   const [trafficHistory, setTrafficHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
@@ -102,13 +133,6 @@ export default function MikroTikPage() {
   const [maxRx, setMaxRx] = useState({ speed: 0, timestamp: 0 });
   const [logs, setLogs] = useState([]);
   const selectedInterfaceRef = useRef(null);
-  const { data, isLoading, error } = useSWR(
-    "/api/mikrotik?resource=interface",
-    fetcher,
-    {
-      refreshInterval: 5000,
-    },
-  );
   const cpuLoad = Number(systemInfo["cpu-load"]) || 0;
   const totalMemory = Number(systemInfo["total-memory"]) || 0;
   const freeMemory = Number(systemInfo["free-memory"]) || 0;
