@@ -1,8 +1,5 @@
 "use client";
 import {
-  ArrowDown,
-  ArrowUp,
-  Bolt,
   ChartLine,
   ChevronDown,
   Clock,
@@ -14,8 +11,8 @@ import {
   Shield,
   Users,
   WavePulse,
-  Wifi,
 } from "@primeicons/react";
+
 import {
   Chart as ChartJS,
   ArcElement,
@@ -28,12 +25,14 @@ import {
   Title,
   Filler,
 } from "chart.js";
+
 import { Doughnut, Line } from "react-chartjs-2";
 import { Card } from "@primereact/ui/card";
 import { Select } from "@primereact/ui/select";
 import useSWR from "swr";
-import { useMemo, useRef, useState } from "react";
-
+import { useEffect, useMemo, useRef, useState } from "react";
+import { socket } from "@/socket";
+import { io } from "socket.io-client";
 ChartJS.register(
   ArcElement,
   Tooltip,
@@ -86,27 +85,20 @@ function StatShell({ children, delay = "" }) {
 
 const toMbps = (bits) => Number((Number(bits || 0) / 1000000).toFixed(2));
 
-async function getRouterResource() {
-  // Gunakan URL absolut saat mengambil data di dalam Server Component
-  const res = await fetch("http://localhost:3000/api/mikrotik", {
-    cache: "no-store", // Memastikan data selalu fresh dari MikroTik setiap kali halaman dibuka
-  });
-
-  if (!res.ok) {
-    throw new Error("Gagal mengambil data dari API MikroTik");
-  }
-
-  return res.json();
-}
 export default function MikroTikPage() {
-  const { data, isLoading, error } = useSWR(
-    "/api/mikrotik/?resource=resource",
-    fetcher,
-    {
-      refreshInterval: 5000,
-    },
-  );
-  let systemInfo = data?.data[0] || {
+  const {
+    data: resourceData,
+    isLoading: resourceLoading,
+    error: resourceError,
+  } = useSWR("/api/mikrotik/?resource=resource", fetcher, {
+    refreshInterval: 5000,
+  });
+  const {
+    data: interfacesData,
+    isLoading: interfacesLoading,
+    error: interfacesError,
+  } = useSWR("/api/mikrotik/?resource=interfaces", fetcher);
+  let systemInfo = resourceData?.data[0] || {
     uptime: "0s",
     version: "—",
     "build-time": "",
@@ -123,28 +115,26 @@ export default function MikroTikPage() {
     "board-name": "Menghubungkan…",
     platform: "-",
   };
-
-  const [trafficHistory, setTrafficHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [connected, setConnected] = useState(false);
-  const [interfaces, setInterfaces] = useState([]);
+  const interfaces = interfacesData?.data || [];
   const [selectedInterface, setSelectedInterface] = useState(null);
-  const [maxTx, setMaxTx] = useState({ speed: 0, timestamp: 0 });
-  const [maxRx, setMaxRx] = useState({ speed: 0, timestamp: 0 });
+  const currentInterface = selectedInterface || interfaces[0]?.["name"] || "";
+  const [trafficHistory, setTrafficHistory] = useState([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const [traffic, setTraffic] = useState(null);
+  const [maxTx, setMaxTx] = useState(0);
+  const [maxRx, setMaxRx] = useState(0);
   const [logs, setLogs] = useState([]);
   const selectedInterfaceRef = useRef(null);
+  const previousTrafficRef = useRef(null);
   const cpuLoad = Number(systemInfo["cpu-load"]) || 0;
   const totalMemory = Number(systemInfo["total-memory"]) || 0;
   const freeMemory = Number(systemInfo["free-memory"]) || 0;
   const ramTotalMB = Math.round(totalMemory / 1024 / 1024);
   const ramFreeMB = Math.round(freeMemory / 1024 / 1024);
   const ramUsedMB = Math.max(0, ramTotalMB - ramFreeMB);
-  const ramPct =
-    ramTotalMB > 0 ? Math.round((ramUsedMB / ramTotalMB) * 100) : 0;
 
-  const lastPoint = trafficHistory[trafficHistory.length - 1];
-  const liveRx = lastPoint ? toMbps(lastPoint.rx) : 0;
-  const liveTx = lastPoint ? toMbps(lastPoint.tx) : 0;
+  const [liveRx, setLiveRx] = useState(0);
+  const [liveTx, setLiveTx] = useState(0);
 
   const cpuStatus =
     cpuLoad >= 85
@@ -185,20 +175,27 @@ export default function MikroTikPage() {
       datasets: [
         {
           label: "Download",
-          data: trafficHistory.map((item) => toMbps(item.rx)),
+          data: trafficHistory.map((item) => item.rx),
           borderColor: "#34d399",
           backgroundColor: (ctx) => {
             const { chart } = ctx;
             const { ctx: c, chartArea } = chart;
-            if (!chartArea) return "rgba(16,185,129,0.12)";
+
+            if (!chartArea) {
+              return "rgba(16,185,129,0.12)";
+            }
+
             const g = c.createLinearGradient(
               0,
               chartArea.top,
               0,
               chartArea.bottom,
             );
+
             g.addColorStop(0, "rgba(16,185,129,0.32)");
+
             g.addColorStop(1, "rgba(16,185,129,0.01)");
+
             return g;
           },
           fill: true,
@@ -208,22 +205,30 @@ export default function MikroTikPage() {
           pointHoverRadius: 4,
           pointBackgroundColor: "#34d399",
         },
+
         {
           label: "Upload",
-          data: trafficHistory.map((item) => toMbps(item.tx)),
+          data: trafficHistory.map((item) => item.tx),
           borderColor: "#22d3ee",
           backgroundColor: (ctx) => {
             const { chart } = ctx;
             const { ctx: c, chartArea } = chart;
-            if (!chartArea) return "rgba(34,211,238,0.10)";
+
+            if (!chartArea) {
+              return "rgba(34,211,238,0.10)";
+            }
+
             const g = c.createLinearGradient(
               0,
               chartArea.top,
               0,
               chartArea.bottom,
             );
+
             g.addColorStop(0, "rgba(34,211,238,0.28)");
+
             g.addColorStop(1, "rgba(34,211,238,0.01)");
+
             return g;
           },
           fill: true,
@@ -238,16 +243,62 @@ export default function MikroTikPage() {
     }),
     [trafficHistory],
   );
-  const handleSelectInterface = (interfaceName) => {
-    selectedInterfaceRef.current = interfaceName;
-    setSelectedInterface(interfaceName);
+
+  const handleSelectInterface = (selectedItem) => {
+    selectedInterfaceRef.current = selectedItem;
+    setSelectedInterface(selectedItem);
     setTrafficHistory([]);
-    setMaxRx({ speed: 0, timestamp: 0 });
-    setMaxTx({ speed: 0, timestamp: 0 });
+    setMaxRx(0);
+    setMaxTx(0);
   };
-  if (isLoading)
+
+  useEffect(() => {
+    if (!currentInterface) return;
+    const socket = io("http://localhost:3000");
+    socket.on("connect", () => {
+      console.log("Socket connected:", socket.id);
+      setIsConnected(true);
+      socket.emit("request-traffic", currentInterface);
+    });
+
+    socket.on("traffic-update", (data) => {
+      if (!data) return;
+      const txMbps = toMbps(Number(data["rx-bits-per-second"] || 0));
+      const rxMbps = toMbps(Number(data["tx-bits-per-second"] || 0));
+      const traffic = {
+        time: new Date().toLocaleTimeString(),
+        rx: rxMbps,
+        tx: txMbps,
+      };
+      setTrafficHistory((prev) => [...prev.slice(-29), traffic]);
+      if (maxRx < rxMbps) {
+        setMaxRx(rxMbps);
+      }
+      if (maxTx < txMbps) {
+        setMaxTx(txMbps);
+      }
+      setLiveRx(rxMbps);
+      setLiveTx(txMbps);
+    });
+
+    socket.on("disconnect", () => {
+      console.log("Socket disconnected");
+      setIsConnected(false);
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error("Socket connection error:", error);
+      setIsConnected(false);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [currentInterface, maxTx, maxRx]);
+
+  if (resourceLoading)
     return <div className="p-5 text-slate-500">Loading MikroTik...</div>;
-  if (error)
+  if (resourceError || interfacesError)
     return <div className="p-5 text-red-600">Error: {error.message}</div>;
   return (
     <div className="space-y-6">
@@ -260,40 +311,44 @@ export default function MikroTikPage() {
             </h1>
             <span
               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${
-                connected
+                isConnected
                   ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
-                  : "border-amber-500/25 bg-amber-500/10 text-amber-300"
+                  : resourceLoading
+                    ? "border-amber-500/25 bg-amber-500/10 text-amber-300"
+                    : "border-red-500/25 bg-red-500/10 text-red-300"
               }`}
             >
               <span className="relative flex h-1.5 w-1.5">
                 <span
                   className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${
-                    connected ? "bg-emerald-400" : "bg-amber-400"
+                    isConnected
+                      ? "bg-emerald-400"
+                      : resourceLoading
+                        ? "bg-amber-400"
+                        : "bg-red-500"
                   }`}
                 />
                 <span
                   className={`relative inline-flex h-1.5 w-1.5 rounded-full ${
-                    connected ? "bg-emerald-400" : "bg-amber-400"
+                    isConnected
+                      ? "bg-emerald-400"
+                      : resourceLoading
+                        ? "bg-amber-400"
+                        : "bg-red-500"
                   }`}
                 />
               </span>
-              {connected ? "LIVE" : isLoading ? "CONNECTING" : "OFFLINE"}
+              {isConnected
+                ? "ONLINE"
+                : resourceLoading
+                  ? "CONNECTING"
+                  : "OFFLINE"}
             </span>
           </div>
           <p className="mt-1.5 text-[13px] text-slate-400">
             Pantau kesehatan router, trafik real-time, dan log sistem dalam satu
             tempat.
           </p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 font-mono">
-            <Clock className="size-3.5 text-emerald-400" />
-            Uptime {systemInfo.uptime}
-          </span>
-          <span className="hidden items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 font-semibold sm:inline-flex">
-            <Wifi className="size-3.5 text-cyan-300" />
-            {selectedInterface || "—"}
-          </span>
         </div>
       </div>
 
@@ -311,24 +366,55 @@ export default function MikroTikPage() {
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-[11px] font-bold text-emerald-300">
-                  <span className="size-1.5 rounded-full bg-emerald-400 animate-[pulse-dot_2s_infinite]" />
-                  ONLINE · RouterOS
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+                    isConnected
+                      ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
+                      : resourceLoading
+                        ? "border-amber-500/25 bg-amber-500/10 text-amber-300"
+                        : "border-red-500/25 bg-red-500/10 text-red-300"
+                  }`}
+                >
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span
+                      className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${
+                        isConnected
+                          ? "bg-emerald-400"
+                          : resourceLoading
+                            ? "bg-amber-400"
+                            : "bg-red-500"
+                      }`}
+                    />
+                    <span
+                      className={`relative inline-flex h-1.5 w-1.5 rounded-full ${
+                        isConnected
+                          ? "bg-emerald-400"
+                          : resourceLoading
+                            ? "bg-amber-400"
+                            : "bg-red-500"
+                      }`}
+                    />
+                  </span>
+                  {isConnected
+                    ? "ONLINE"
+                    : resourceLoading
+                      ? "CONNECTING"
+                      : "OFFLINE"}
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-slate-300">
-                  v{systemInfo.version}
+                  RouterOs v{systemInfo.version}
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-slate-300">
-                  {systemInfo["architecture-name"]} · {systemInfo.platform}
+                  {systemInfo["architecture-name"]}
                 </span>
               </div>
-              <h2 className="mt-3 truncate text-xl font-extrabold tracking-tight text-white md:text-2xl">
-                {systemInfo["board-name"] || "MikroTik Router"}
+
+              <h3 className="mt-3 truncate text-xl font-extrabold tracking-tight text-white md:text-2xl">
+                {systemInfo.platform || "MikroTik Router"}
+              </h3>
+              <h2 className=" truncate text-xl font-extrabold tracking-tight text-white md:text-2xl">
+                {systemInfo["board-name"] || "--.--"}
               </h2>
-              <p className="mt-1 text-[13px] text-slate-400">
-                {systemInfo.cpu} · {systemInfo["cpu-frequency"]} MHz ·{" "}
-                {systemInfo["cpu-count"]} Cores
-              </p>
               <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                   {
@@ -375,26 +461,26 @@ export default function MikroTikPage() {
             <div className="grid shrink-0 grid-cols-2 gap-3 lg:w-72">
               <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/8 p-4">
                 <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-300/80">
-                  <CloudDownload className="size-3.5" /> RX Live
+                  <CloudDownload className="size-3.5" /> Max Download
                 </div>
                 <div className="mt-1 font-mono text-2xl font-extrabold text-emerald-300">
-                  {liveRx}
+                  {maxRx}
                   <span className="ml-1 text-xs font-semibold">Mbps</span>
                 </div>
               </div>
               <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/8 p-4">
                 <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-cyan-300/80">
-                  <CloudUpload className="size-3.5" /> TX Live
+                  <CloudUpload className="size-3.5" /> Max Upload
                 </div>
                 <div className="mt-1 font-mono text-2xl font-extrabold text-cyan-300">
-                  {liveTx}
+                  {maxTx}
                   <span className="ml-1 text-xs font-semibold">Mbps</span>
                 </div>
               </div>
               <div className="col-span-2 rounded-2xl border border-white/8 bg-white/3 p-4">
                 <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   <span className="inline-flex items-center gap-1.5">
-                    <Bolt className="size-3.5 text-amber-300" /> Beban CPU
+                    <Microchip className="size-3.5 text-amber-300" /> Beban CPU
                   </span>
                   <span className="font-mono text-slate-200">{cpuLoad}%</span>
                 </div>
@@ -404,145 +490,30 @@ export default function MikroTikPage() {
                     style={{ width: `${Math.min(cpuLoad, 100)}%` }}
                   />
                 </div>
+                <div className="flex items-center justify-between text-slate-500">
+                  <p className="mt-2.5 text-xs text-slate-500">
+                    Jumlah Core ·{" "}
+                    <span className="font-bold text-slate-300">
+                      {systemInfo["cpu-count"]} Cores
+                    </span>
+                  </p>
+                  <p className="mt-2.5 text-xs text-slate-500">
+                    Frequency ·{" "}
+                    <span className="font-bold text-slate-300">
+                      {systemInfo["cpu-frequency"]} MHz
+                    </span>
+                  </p>
+                  <p className="mt-2.5 text-xs text-slate-500">
+                    Status ·{" "}
+                    <span className="font-bold text-slate-300">
+                      {cpuStatus.label}
+                    </span>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Metric cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatShell delay="stagger-1">
-          <div className="flex items-start justify-between">
-            <IconTile tone="violet">
-              <Microchip />
-            </IconTile>
-            <span
-              className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${cpuStatus.cls}`}
-            >
-              {cpuStatus.label}
-            </span>
-          </div>
-          <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-            CPU Load
-          </p>
-          <p className="mt-1 font-mono text-3xl font-extrabold tracking-tight text-white">
-            {cpuLoad}
-            <span className="text-sm font-bold text-slate-400">%</span>
-          </p>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/8">
-            <div
-              className="h-full rounded-full bg-linear-to-r from-violet-400 to-indigo-400 transition-all duration-700"
-              style={{ width: `${Math.min(cpuLoad, 100)}%` }}
-            />
-          </div>
-          <p className="mt-2.5 text-xs text-slate-500">
-            Core Count ·{" "}
-            <span className="font-bold text-slate-300">
-              {systemInfo["cpu-count"]} Cores
-            </span>
-          </p>
-        </StatShell>
-
-        <StatShell delay="stagger-2">
-          <div className="flex items-start justify-between">
-            <IconTile tone="emerald">
-              <Server />
-            </IconTile>
-            <span className="font-mono text-xs font-bold text-slate-300">
-              {ramUsedMB} / {ramTotalMB} MB
-            </span>
-          </div>
-          <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-            Memory (RAM) · {ramPct}%
-          </p>
-          <div className="mt-1 flex items-center gap-3">
-            <div className="relative h-16 w-16 shrink-0">
-              <Doughnut
-                data={ramData}
-                options={{
-                  maintainAspectRatio: false,
-                  cutout: "72%",
-                  plugins: {
-                    legend: { display: false },
-                    tooltip: { enabled: true },
-                  },
-                }}
-              />
-              <span className="absolute inset-0 flex items-center justify-center font-mono text-[11px] font-extrabold text-white">
-                {ramPct}%
-              </span>
-            </div>
-            <div className="min-w-0 text-xs">
-              <div className="flex items-center gap-1.5 text-slate-300">
-                <span className="size-2 rounded-full bg-emerald-400" />
-                Terpakai <b className="font-mono">{ramUsedMB} MB</b>
-              </div>
-              <div className="mt-1.5 flex items-center gap-1.5 text-slate-400">
-                <span className="size-2 rounded-full bg-slate-600" />
-                Bebas <b className="font-mono text-slate-300">{ramFreeMB} MB</b>
-              </div>
-            </div>
-          </div>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/8">
-            <div
-              className="h-full rounded-full bg-linear-to-r from-emerald-400 to-teal-300 transition-all duration-700"
-              style={{ width: `${ramPct}%` }}
-            />
-          </div>
-        </StatShell>
-
-        <StatShell delay="stagger-3">
-          <div className="flex items-start justify-between">
-            <IconTile tone="emerald">
-              <ArrowDown />
-            </IconTile>
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold text-emerald-300">
-              <span className="size-1.5 rounded-full bg-emerald-400" /> RX
-            </span>
-          </div>
-          <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-            Max Download
-          </p>
-          <p className="mt-1 font-mono text-3xl font-extrabold tracking-tight text-emerald-300">
-            {toMbps(maxRx.speed)}
-            <span className="ml-1 text-sm font-bold text-emerald-300/60">
-              Mbps
-            </span>
-          </p>
-          <p className="mt-2.5 flex items-center gap-1.5 text-xs text-slate-500">
-            <History className="size-3.5" /> Pukul {maxRx.timestamp || "—"} ·{" "}
-            <span className="truncate font-semibold text-slate-400">
-              {selectedInterface}
-            </span>
-          </p>
-        </StatShell>
-
-        <StatShell delay="stagger-4">
-          <div className="flex items-start justify-between">
-            <IconTile tone="cyan">
-              <ArrowUp />
-            </IconTile>
-            <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/25 bg-cyan-500/10 px-2 py-1 text-[11px] font-bold text-cyan-300">
-              <span className="size-1.5 rounded-full bg-cyan-400" /> TX
-            </span>
-          </div>
-          <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-            Max Upload
-          </p>
-          <p className="mt-1 font-mono text-3xl font-extrabold tracking-tight text-cyan-300">
-            {toMbps(maxTx.speed)}
-            <span className="ml-1 text-sm font-bold text-cyan-300/60">
-              Mbps
-            </span>
-          </p>
-          <p className="mt-2.5 flex items-center gap-1.5 text-xs text-slate-500">
-            <History className="size-3.5" /> Pukul {maxTx.timestamp || "—"} ·{" "}
-            <span className="truncate font-semibold text-slate-400">
-              {selectedInterface}
-            </span>
-          </p>
-        </StatShell>
       </div>
 
       {/* Traffic */}
@@ -571,11 +542,11 @@ export default function MikroTikPage() {
               Mbps
             </span>
             <Select.Root
-              value={selectedInterface}
+              value={currentInterface}
               onValueChange={(e) => handleSelectInterface(e.value)}
               options={interfaces}
-              optionLabel="label"
-              optionValue="value"
+              optionLabel="name"
+              optionValue="name"
               className="w-full sm:w-56"
               size="small"
             >
@@ -730,7 +701,7 @@ export default function MikroTikPage() {
           <div className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1">
             {logs.length === 0 && (
               <div className="rounded-2xl border border-white/8 bg-white/2 p-6 text-center text-xs text-slate-500">
-                {isLoading
+                {resourceLoading
                   ? "Menghubungkan ke router…"
                   : "Belum ada log masuk."}
               </div>

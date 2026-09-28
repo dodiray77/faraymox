@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mikrotikClient, mockInterfaces } from "@/lib/mikrotik";
+import { connectMikrotik, mockInterfaces } from "@/lib/mikrotik";
 import { isMock } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
@@ -12,11 +12,11 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const resource = searchParams.get("resource") || "resource";
   try {
-    const router = await mikrotikClient.connect();
+    const router = await connectMikrotik();
     isConnected = true;
     let rawData;
     switch (resource) {
-      case "interface":
+      case "interfaces":
         rawData = await router.write("/interface/print");
         break;
 
@@ -26,7 +26,6 @@ export async function GET(req) {
     }
 
     const data = rawData;
-
     return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error("MikroTik API error:", error);
@@ -43,8 +42,4 @@ export async function GET(req) {
       { status: 500 },
     );
   }
-}
-
-export async function GETwebsocket(req) {
-  const { socket } = awaitupgrade(req);
 }

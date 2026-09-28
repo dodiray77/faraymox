@@ -8,18 +8,19 @@ export function useTheme() {
 }
 
 export default function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState("dark");
-
-  useEffect(() => {
+  // Initialize state with function — runs ONCE at mount, NOT in useEffect
+  const [theme, setTheme] = useState(() => {
+    // Hanya di klien (browser), localStorage tersedia
+    if (typeof window === "undefined") return "dark";
     const saved = localStorage.getItem("sentinel-theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initial = saved || (prefersDark ? "dark" : "dark");
-    setTheme(initial);
-    document.documentElement.classList.toggle("my-app-dark", initial === "dark");
-    document.documentElement.classList.toggle("light", initial === "light");
-  }, []);
+    return saved || (prefersDark ? "dark" : "dark");
+  });
 
+  // Just sync DOM classes + localStorage when theme changes (from toggle)
   useEffect(() => {
+    // Juga hanya di klien
+    if (typeof window === "undefined") return;
     document.documentElement.classList.toggle("my-app-dark", theme === "dark");
     document.documentElement.classList.toggle("light", theme === "light");
     localStorage.setItem("sentinel-theme", theme);
