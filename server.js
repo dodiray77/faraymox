@@ -2,10 +2,11 @@ import { createServer } from "node:http";
 import next from "next";
 import { Server } from "socket.io";
 import { getInterfaceTraffic } from "./src/lib/mikrotik.js";
+import { env } from "./src/app/config/env.js";
 
-const dev = process.env.NODE_ENV !== "production";
-const hostname = "localhost";
-const port = 3000;
+const dev = env.nodeEnv !== "production";
+const hostname = env.host;
+const port = env.port;
 // when using middleware `hostname` and `port` must be provided below
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();

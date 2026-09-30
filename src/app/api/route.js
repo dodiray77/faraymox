@@ -1,32 +1,27 @@
 import { NextResponse } from "next/server";
-import { connectMikrotik, mockInterfaces } from "@/lib/mikrotik";
 import { isMock } from "@/lib/config";
+import { DEVICES } from "@/data/device";
+import { DeviceService } from "@/lib/services/device.service";
 import { MikrotikService } from "@/lib/services/mikrotik.service";
-
 export const dynamic = "force-dynamic";
 
 export async function GET(req) {
   if (isMock) {
-    return NextResponse.json({ success: true, data: mockInterfaces });
+    return NextResponse.json({ success: true, data: DEVICES });
   }
-  let isConnected = false;
   const { searchParams } = new URL(req.url);
-  const resource = searchParams.get("resource") || "resource";
-  const id = searchParams.get("id") || "id";
+  const resource = searchParams.get("type") || "type";
+  let isConnected = false;
   try {
-    const device = await MikrotikService.getDeviceById(id);
-    const router = await connectMikrotik(device);
-    isConnected = true;
     let rawData;
     switch (resource) {
-      case "interfaces":
-        rawData = await router.write("/interface/print");
+      case "mikrotik":
+        rawData = await MikrotikService.getDevicesMikrotik();
         break;
       default:
-        rawData = await router.write("/system/resource/print");
+        rawData = await DeviceService.getDevices();
         break;
     }
-
     const data = rawData;
     return NextResponse.json({ success: true, data });
   } catch (error) {
@@ -45,18 +40,10 @@ export async function GET(req) {
     );
   }
 }
-
 export async function POST(req) {
   try {
     const body = await req.json();
-    const data = await MikrotikService.createMikrotik({
-      ...body,
-      category: {
-        connect: {
-          id: "58abf611-108f-49bb-979c-f9cf1f14f437",
-        },
-      },
-    });
+    const data = await DeviceService.createCategory(body.name);
     return NextResponse.json({ success: true, data });
   } catch (error) {
     return NextResponse.json(

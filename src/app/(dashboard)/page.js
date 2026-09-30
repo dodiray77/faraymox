@@ -2,10 +2,11 @@
 import { Desktop, Search, Server, Sitemap, Times } from "@primeicons/react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { DEVICE_TYPES, DEVICES, getDeviceHref } from "@/data/device";
+import { DEVICE_TYPES, getDeviceHref } from "@/data/device";
 import { Card } from "@primereact/ui/card";
 import { useTheme } from "@/components/ThemeProvider";
-
+import useSWR from "swr";
+const fetcher = (u) => fetch(u).then((r) => r.json());
 const GROUP_STYLE = {
   router: {
     icon: Sitemap,
@@ -117,7 +118,7 @@ function GroupSection({ type, items }) {
     <section className="animate-fade-up">
       <div className="mb-4 flex items-center gap-3">
         <div
-          className={`flex size-9 items-center justify-center rounded-xl bg-linear-to-br ${style.tone} text-slate-950 shadow-lg [&_svg]:size-[18px]`}
+          className={`flex size-9 items-center justify-center rounded-xl bg-linear-to-br ${style.tone} text-slate-950 shadow-lg [&_svg]:size-4.5`}
         >
           <Icon />
         </div>
@@ -137,7 +138,7 @@ function GroupSection({ type, items }) {
         </div>
       </div>
       {items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center">
+        <div className="rounded-2xl border border-dashed border-white/10 bg-white/2 px-6 py-12 text-center">
           <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-white/5 border border-white/10 text-slate-500">
             <Icon className="size-5" />
           </div>
@@ -199,29 +200,30 @@ const STATS = [
 export default function Dashboard() {
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState("all");
-
+  const { data, isLoading, error } = useSWR("/api", fetcher, {
+    refreshInterval: 30000,
+  });
+  const devices = useMemo(() => data?.data || [], [data]);
   const counts = useMemo(
     () => ({
-      total: DEVICES.length,
-      router: DEVICES.filter((d) => d.type === "router").length,
-      proxmox: DEVICES.filter((d) => d.type === "proxmox").length,
-      docker: DEVICES.filter((d) => d.type === "docker").length,
-      online: DEVICES.filter((d) => d.status === "online").length,
-      offline: DEVICES.filter((d) => d.status === "offline").length,
+      total: devices.length,
+      router: devices.filter((d) => d.type === "router").length,
+      proxmox: devices.filter((d) => d.type === "proxmox").length,
+      docker: devices.filter((d) => d.type === "docker").length,
     }),
-    [],
+    [devices],
   );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return DEVICES.filter((d) => {
+    return devices.filter((d) => {
       if (tab !== "all" && d.type !== tab) return false;
       if (!q) return true;
       return [d.name, d.ip, d.mac, d.model, d.location, d.version]
         .filter(Boolean)
         .some((v) => v.toLowerCase().includes(q));
     });
-  }, [query, tab]);
+  }, [devices, query, tab]);
 
   const groups = useMemo(
     () => ({
@@ -305,7 +307,7 @@ export default function Dashboard() {
                   ? `${counts.offline} offline`
                   : s.key === "total"
                     ? "terinventaris"
-                    : `${DEVICES.filter((d) => d.type === s.key && d.status === "online").length} online`}
+                    : `${devices.filter((d) => d.type === s.key && d.status === "online").length} online`}
               </p>
             </div>
           );
@@ -313,7 +315,7 @@ export default function Dashboard() {
       </div>
 
       <div className="animate-fade-up stagger-2 flex flex-col gap-3 rounded-2xl border border-white/8 bg-slate-900/40 p-3 backdrop-blur sm:flex-row sm:items-center sm:p-3">
-        <label className="group flex flex-1 items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-[13px] text-slate-400 transition-colors focus-within:border-emerald-500/40 focus-within:bg-white/[0.06] focus-within:text-white">
+        <label className="group flex flex-1 items-center gap-2.5 rounded-xl border border-white/10 bg-white/4 px-3.5 py-2.5 text-[13px] text-slate-400 transition-colors focus-within:border-emerald-500/40 focus-within:bg-white/6 focus-within:text-white">
           <Search className="size-4 shrink-0 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
           <input
             value={query}
@@ -341,7 +343,7 @@ export default function Dashboard() {
               className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3.5 py-2.5 text-xs font-bold whitespace-nowrap transition-all ${
                 tab === t.value
                   ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200 shadow-[0_0_20px_-12px_rgba(16,185,129,0.6)]"
-                  : "border-white/10 bg-white/[0.04] text-slate-400 hover:border-white/15 hover:bg-white/10 hover:text-white"
+                  : "border-white/10 bg-white/4 text-slate-400 hover:border-white/15 hover:bg-white/10 hover:text-white"
               }`}
             >
               {t.label}

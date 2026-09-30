@@ -59,38 +59,38 @@ export function dropConnection(deviceId) {
   }
 }
 
-export async function connectMikrotik(deviceId = "default") {
+export async function connectMikrotik(device) {
   // Gunakan koneksi yang sudah ada
-  const existingClient = connections.get(deviceId);
+  const existingClient = connections.get(device);
 
   if (existingClient) {
     return existingClient;
   }
 
   const client = new RouterOSAPI({
-    host: process.env.MIKROTIK_HOST || "192.168.88.1",
-    user: process.env.MIKROTIK_USER || "admin",
-    password: process.env.MIKROTIK_PASSWORD || "password_kamu",
-    port: parseInt(process.env.MIKROTIK_PORT || "8728", 10),
+    host: device.host,
+    user: device.username,
+    password: device.password,
+    port: parseInt(device.port, 10),
     timeout: 10000,
   });
 
   try {
     client.on("error", (error) => {
-      console.error(`MikroTik API error [${deviceId}]:`, error.message);
+      console.error(`MikroTik API error [${device}]:`, error.message);
 
-      connections.delete(deviceId);
+      connections.delete(device);
     });
 
     await client.connect();
 
-    connections.set(deviceId, client);
+    connections.set(device, client);
 
-    console.log(`MikroTik connected [${deviceId}]`);
+    console.log(`MikroTik connected [${device}]`);
 
     return client;
   } catch (error) {
-    console.error(`Gagal connect MikroTik [${deviceId}]:`, error.message);
+    console.error(`Gagal connect MikroTik [${device}]:`, error.message);
 
     try {
       client.close();

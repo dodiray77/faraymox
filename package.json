@@ -6,7 +6,8 @@
     "dev": "node server.js",
     "build": "next build",
     "start": "NODE_ENV=production node server.js",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "prisma skills sync || exit 0"
   },
   "type": "module",
   "dependencies": {
@@ -15,8 +16,13 @@
     "@primereact/hooks": "^11.1.0",
     "@primereact/ui": "^11.1.0",
     "@primeuix/themes": "^3.0.1",
+    "@prisma/adapter-better-sqlite3": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "better-sqlite3": "^13.0.3",
     "chart.js": "^4.5.1",
+    "dotenv": "^18.0.4",
     "next": "16.3.6",
+    "ping": "^1.0.0",
     "react": "19.2.8",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "19.2.8",
@@ -30,9 +36,13 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.3",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "install": "^0.13.0",
+    "prisma": "^7.10.0",
     "tailwindcss": "^4"
   },
   "packageManager": "pnpm@12.4.2"

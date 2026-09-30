@@ -144,8 +144,7 @@ export function groupDevices(devices) {
 }
 
 export function getDeviceHref(device) {
-  const type = DEVICE_TYPES[device.type];
-  if (!type) return "/";
-  // bawa id sebagai query agar halaman tujuan bisa highlight/detail
-  return `${type.href}?highlight=${device.id}`;
+  if (!device?.id) return "/";
+
+  return `/mikrotik/${device.id}`;
 }
