@@ -31,9 +31,9 @@ import { Card } from "@primereact/ui/card";
 import { Select } from "@primereact/ui/select";
 import useSWR from "swr";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { socket } from "@/socket";
 import { io } from "socket.io-client";
 import { useParams } from "next/navigation";
+
 ChartJS.register(
   ArcElement,
   Tooltip,
@@ -63,6 +63,7 @@ function IconTile({ tone, children }) {
     </div>
   );
 }
+
 function formatBytes(bytes) {
   const b = Number(bytes || 0);
   if (b <= 0) return "0 B";
@@ -88,51 +89,64 @@ const toMbps = (bits) => Number((Number(bits || 0) / 1000000).toFixed(2));
 
 export default function MikroTikPage() {
   const params = useParams();
-  const id = params.id;
+  const id = params.id; // Ini bertindak sebagai deviceId dari database
+
   const {
     data: resourceData,
     isLoading: resourceLoading,
     error: resourceError,
   } = useSWR(
-    `/api/mikrotik?id=${encodeURIComponent(id)}&resource=resource`,
+    id ? `/api/mikrotik?id=${encodeURIComponent(id)}&resource=resource` : null,
     fetcher,
-    {
-      refreshInterval: 5000,
-    },
   );
+
+  const hasData = resourceData?.data && resourceData.data.length > 0;
+
+  // 2. Jika ada, gunakan indeks. Jika belum ada, gunakan objek default/loading
+  let systemInfo = hasData
+    ? resourceData.data[0]
+    : {
+        uptime: "0s",
+        version: "—",
+        "build-time": "",
+        "factory-software": "",
+        "free-memory": "0",
+        "total-memory": "0",
+        cpu: "-",
+        "cpu-count": "0",
+        "cpu-frequency": "0",
+        "cpu-load": "0",
+        "free-hdd-space": "0",
+        "total-hdd-space": "0",
+        "architecture-name": "-",
+        "board-name": "Menghubungkan…",
+        platform: "-",
+      };
+
   const {
     data: interfacesData,
     isLoading: interfacesLoading,
     error: interfacesError,
   } = useSWR(
-    `/api/mikrotik/?id=${encodeURIComponent(id)}&resource=interfaces`,
+    id
+      ? `/api/mikrotik/?id=${encodeURIComponent(id)}&resource=interfaces`
+      : null,
     fetcher,
   );
-  let systemInfo = resourceData?.data || {
-    uptime: "0s",
-    version: "—",
-    "build-time": "",
-    "factory-software": "",
-    "free-memory": "0",
-    "total-memory": "0",
-    cpu: "-",
-    "cpu-count": "0",
-    "cpu-frequency": "0",
-    "cpu-load": "0",
-    "free-hdd-space": "0",
-    "total-hdd-space": "0",
-    "architecture-name": "-",
-    "board-name": "Menghubungkan…",
-    platform: "-",
-  };
+
   const interfaces = interfacesData?.data || [];
   const [selectedInterface, setSelectedInterface] = useState(null);
+
+  // FIX: currentInterface murni string nama interface (contoh: "ether1")
   const currentInterface = selectedInterface || interfaces[0]?.["name"] || "";
+
   const [trafficHistory, setTrafficHistory] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [maxTx, setMaxTx] = useState(0);
   const [maxRx, setMaxRx] = useState(0);
-  const [logs, setLogs] = useState([]);
+  const [liveRx, setLiveRx] = useState(0);
+  const [liveTx, setLiveTx] = useState(0);
+
   const selectedInterfaceRef = useRef(null);
   const cpuLoad = Number(systemInfo["cpu-load"]) || 0;
   const totalMemory = Number(systemInfo["total-memory"]) || 0;
@@ -140,25 +154,6 @@ export default function MikroTikPage() {
   const ramTotalMB = Math.round(totalMemory / 1024 / 1024);
   const ramFreeMB = Math.round(freeMemory / 1024 / 1024);
   const ramUsedMB = Math.max(0, ramTotalMB - ramFreeMB);
-
-  const [liveRx, setLiveRx] = useState(0);
-  const [liveTx, setLiveTx] = useState(0);
-
-  const cpuStatus =
-    cpuLoad >= 85
-      ? {
-          label: "Tinggi",
-          cls: "bg-rose-500/10 text-rose-300 border-rose-500/25",
-        }
-      : cpuLoad >= 60
-        ? {
-            label: "Sedang",
-            cls: "bg-amber-500/10 text-amber-300 border-amber-500/25",
-          }
-        : {
-            label: "Normal",
-            cls: "bg-emerald-500/10 text-emerald-300 border-emerald-500/25",
-          };
 
   const dataTraffic = useMemo(
     () => ({
@@ -171,22 +166,15 @@ export default function MikroTikPage() {
           backgroundColor: (ctx) => {
             const { chart } = ctx;
             const { ctx: c, chartArea } = chart;
-
-            if (!chartArea) {
-              return "rgba(16,185,129,0.12)";
-            }
-
+            if (!chartArea) return "rgba(16,185,129,0.12)";
             const g = c.createLinearGradient(
               0,
               chartArea.top,
               0,
               chartArea.bottom,
             );
-
             g.addColorStop(0, "rgba(16,185,129,0.32)");
-
             g.addColorStop(1, "rgba(16,185,129,0.01)");
-
             return g;
           },
           fill: true,
@@ -196,7 +184,6 @@ export default function MikroTikPage() {
           pointHoverRadius: 4,
           pointBackgroundColor: "#34d399",
         },
-
         {
           label: "Upload",
           data: trafficHistory.map((item) => item.tx),
@@ -204,28 +191,21 @@ export default function MikroTikPage() {
           backgroundColor: (ctx) => {
             const { chart } = ctx;
             const { ctx: c, chartArea } = chart;
-
-            if (!chartArea) {
-              return "rgba(34,211,238,0.10)";
-            }
-
+            if (!chartArea) return "rgba(34,211,238,0.10)";
             const g = c.createLinearGradient(
               0,
               chartArea.top,
               0,
               chartArea.bottom,
             );
-
             g.addColorStop(0, "rgba(34,211,238,0.28)");
-
             g.addColorStop(1, "rgba(34,211,238,0.01)");
-
             return g;
           },
           fill: true,
           tension: 0.45,
           borderWidth: 2,
-          borderDash: [6, 4],
+          borderDash: ["-"],
           pointRadius: 0,
           pointHoverRadius: 4,
           pointBackgroundColor: "#22d3ee",
@@ -241,56 +221,73 @@ export default function MikroTikPage() {
     setTrafficHistory([]);
     setMaxRx(0);
     setMaxTx(0);
+    setLiveRx(0);
+    setLiveTx(0);
   };
 
+  // SYNC DENGAN ROOM-BASED SERVER & TOKEN AMAN
   useEffect(() => {
-    if (!currentInterface) return;
-    const socket = io("http://localhost:3000");
-    socket.on("connect", () => {
-      console.log("Socket connected:", socket.id);
+    if (!id || !currentInterface) return;
+
+    const socketInstance = io("http://localhost:3000");
+
+    socketInstance.on("connect", () => {
       setIsConnected(true);
-      socket.emit("request-traffic", currentInterface);
+
+      // FIX UTAMA: id adalah deviceId dari database, currentInterface adalah nama string interface
+      socketInstance.emit("request-traffic", {
+        deviceId: id,
+        interfaceId: currentInterface,
+      });
     });
 
-    socket.on("traffic-update", (data) => {
+    socketInstance.on("traffic-update", (data) => {
       if (!data) return;
+
       const rxMbps = toMbps(Number(data["rx-bits-per-second"] || 0));
       const txMbps = toMbps(Number(data["tx-bits-per-second"] || 0));
       const traffic = {
-        time: new Date().toLocaleTimeString(),
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
         rx: rxMbps,
         tx: txMbps,
       };
+
       setTrafficHistory((prev) => [...prev.slice(-29), traffic]);
-      if (maxRx < rxMbps) {
-        setMaxRx(rxMbps);
-      }
-      if (maxTx < txMbps) {
-        setMaxTx(txMbps);
-      }
+
+      // Menggunakan functional update untuk performa & menghindari pemutusan socket berulang
+      setMaxRx((prevMax) => (rxMbps > prevMax ? rxMbps : prevMax));
+      setMaxTx((prevMax) => (txMbps > prevMax ? txMbps : prevMax));
       setLiveRx(rxMbps);
       setLiveTx(txMbps);
     });
 
-    socket.on("disconnect", () => {
+    socketInstance.on("disconnect", () => {
       console.log("Socket disconnected");
       setIsConnected(false);
     });
 
-    socket.on("connect_error", (error) => {
-      console.error("Socket connection error:", error);
+    socketInstance.on("connect_error", (error) => {
       setIsConnected(false);
     });
 
     return () => {
-      socket.disconnect();
+      socketInstance.disconnect();
     };
-  }, [currentInterface, maxTx, maxRx]);
 
+    // Bersih dari maxRx/maxTx. Reconnect hanya terjadi bila device ID atau pilihan interface berubah.
+  }, [id, currentInterface]);
   if (resourceLoading)
     return <div className="p-5 text-slate-500">Loading MikroTik...</div>;
   if (resourceError || interfacesError)
-    return <div className="p-5 text-red-600">Error: {error.message}</div>;
+    return (
+      <div className="p-5 text-red-600">
+        Error: {(resourceError || interfacesError).message}
+      </div>
+    );
   return (
     <div className="space-y-6">
       {/* Page heading */}
@@ -502,14 +499,14 @@ export default function MikroTikPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="grid ">
+                  {/* <div className="grid ">
                     <div className="mt-2.5 flex flex-col">
                       <span className="text-xs text-slate-500"> Status · </span>
                       <span className="font-bold text-slate-300">
                         {cpuStatus.label}
                       </span>
                     </div>
-                  </div>
+                  </div> */}
                 </div>
               </div>
             </div>
@@ -676,7 +673,7 @@ export default function MikroTikPage() {
           </div>
         </div>
 
-        <div className="glass card-ring animate-fade-up stagger-5 rounded-3xl p-6 lg:col-span-3">
+        {/* <div className="glass card-ring animate-fade-up stagger-5 rounded-3xl p-6 lg:col-span-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <IconTile tone="cyan">
@@ -724,7 +721,7 @@ export default function MikroTikPage() {
               </div>
             ))}
           </div>
-        </div>
+        </div> */}
       </div>
 
       <p className="pb-2 text-center text-[11px] text-slate-600">

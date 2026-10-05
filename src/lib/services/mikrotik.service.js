@@ -1,11 +1,17 @@
 import prisma from "@/lib/prisma";
 import ping from "ping";
-import { connectMikrotik } from "@/lib/mikrotik";
+import { connectMikrotik, dropConnection } from "@/lib/mikrotik";
 export const MikrotikService = {
   async createMikrotik(data) {
     return await prisma.device.create({
       data: data,
     });
+  },
+  async getOrCreateMikrotikCategory() {
+    const name = "Mikrotik";
+    const existing = await prisma.category.findUnique({ where: { name } });
+    if (existing) return existing;
+    return prisma.category.create({ data: { name } });
   },
   async checkOnline(host) {
     const result = await ping.promise.probe(host, {
@@ -40,7 +46,7 @@ export const MikrotikService = {
     let client;
 
     try {
-      client = await connectMikrotik(device);
+      ({ client } = await connectMikrotik(device));
 
       const identity = await client.write("/system/identity/print");
       const resource = await client.write("/system/resource/print");
@@ -73,18 +79,14 @@ export const MikrotikService = {
         mac,
       };
     } catch (error) {
+      // Koneksi di pool kemungkinan rusak — buang agar percobaan berikutnya membuat koneksi baru.
+      dropConnection(device.id);
       return {
         ...device,
         online: true,
         apiConnected: false,
         error: error.message,
       };
-    } finally {
-      if (client) {
-        try {
-          await client.close();
-        } catch {}
-      }
     }
   },
   async getDeviceById(id) {

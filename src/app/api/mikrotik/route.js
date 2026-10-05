@@ -9,14 +9,31 @@ export async function GET(req) {
   if (isMock) {
     return NextResponse.json({ success: true, data: mockInterfaces });
   }
-  let isConnected = false;
+
   const { searchParams } = new URL(req.url);
   const resource = searchParams.get("resource") || "resource";
-  const id = searchParams.get("id") || "id";
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json(
+      { success: false, error: "Parameter ID perangkat wajib diisi" },
+      { status: 400 },
+    );
+  }
+
   try {
+    // 1. Ambil data sensitif perangkat dari Database
     const device = await MikrotikService.getDeviceById(id);
-    const router = await connectMikrotik(device);
-    isConnected = true;
+    if (!device) {
+      return NextResponse.json(
+        { success: false, error: "Perangkat tidak ditemukan di database" },
+        { status: 404 },
+      );
+    }
+
+    // 2. Hubungkan ke MikroTik. Fungsi ini mereturn { client, deviceKey }
+    // Jika koneksi sudah ada di Map, proses ini instan & memakai koneksi lama!
+    const { client: router } = await connectMikrotik(device);
     let rawData;
     switch (resource) {
       case "interfaces":
@@ -26,18 +43,9 @@ export async function GET(req) {
         rawData = await router.write("/system/resource/print");
         break;
     }
-
-    const data = rawData;
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data: rawData });
   } catch (error) {
-    console.error("MikroTik API error:", error);
-
-    if (isConnected) {
-      try {
-        await mikrotikClient.close();
-        isConnected = false;
-      } catch (_) {}
-    }
+    console.error("MikroTik API error pada Route Handler:", error.message);
 
     return NextResponse.json(
       { success: false, error: error.message || "Unknown error" },
@@ -49,11 +57,12 @@ export async function GET(req) {
 export async function POST(req) {
   try {
     const body = await req.json();
+    const category = await MikrotikService.getOrCreateMikrotikCategory();
     const data = await MikrotikService.createMikrotik({
       ...body,
       category: {
         connect: {
-          id: "58abf611-108f-49bb-979c-f9cf1f14f437",
+          id: category.id,
         },
       },
     });

@@ -35,8 +35,8 @@ export default function SidebarMenu({ children }) {
   const { theme } = useTheme();
   const isLight = theme === "light";
   return (
-    <div className="border border-surface-200 dark:border-surface-700 rounded-lg overflow-hidden">
-      <Sidebar.Layout className="min-h-192! relative!">
+    <div className="h-screen w-screen overflow-hidden">
+      <Sidebar.Layout className="h-full! relative!">
         {isMobile && <Sidebar.Backdrop className="absolute!" />}
         <Sidebar.Root
           id="mobile-nav"
@@ -143,7 +143,7 @@ export default function SidebarMenu({ children }) {
           </Sidebar.Aside>
         </Sidebar.Root>
 
-        <Sidebar.Main>
+        <Sidebar.Main className="h-full! flex flex-col overflow-y-auto">
           <header className="sticky top-0 z-20 flex items-center gap-3 border-b px-4 py-3 backdrop-blur-xl md:px-8">
             <Sidebar.Trigger
               as={Button}
@@ -201,7 +201,7 @@ export default function SidebarMenu({ children }) {
               </Avatar.Root>
             </div>
           </header>
-          {children}
+          <div className="p-4 md:p-8 flex-1">{children}</div>
         </Sidebar.Main>
       </Sidebar.Layout>
     </div>

@@ -3,8 +3,8 @@
 import { Search, Sitemap, Times } from "@primeicons/react";
 import { Icon, useTheme } from "@primereact/core";
 import { Card } from "@primereact/ui/card";
-import { useEffect, useMemo, useState } from "react";
-import { DEVICE_TYPES, getDeviceHref } from "@/data/device";
+import { useMemo, useState } from "react";
+import { getDeviceHref } from "@/data/device";
 import useSWR from "swr";
 import { useRouter } from "next/navigation";
 const fetcher = (u) => fetch(u).then((r) => r.json());
@@ -27,7 +27,7 @@ function StatusBadge({ status }) {
 }
 export default function MikroTikPage() {
   const [query, setQuery] = useState("");
-  const { data, isLoading, error } = useSWR("/api?type=mikrotik", fetcher, {
+  const { data } = useSWR("/api?type=mikrotik", fetcher, {
     refreshInterval: 30000,
   });
   const { theme } = useTheme();
@@ -47,6 +47,15 @@ export default function MikroTikPage() {
       offline,
     };
   }, [items]);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((device) =>
+      [device.name, device.identity, device.host, device.mac, device.location, device.model, device.version]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q)),
+    );
+  }, [items, query]);
 
   return (
     <div className="space-y-7">
@@ -92,7 +101,7 @@ export default function MikroTikPage() {
             </p>
           </div>
         </div>
-        {items.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/10 bg-white/2 px-6 py-12 text-center">
             <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-white/5 border border-white/10 text-slate-500">
               <Icon className="size-5" />
@@ -101,13 +110,14 @@ export default function MikroTikPage() {
               Tidak ada perangkat
             </p>
             <p className="text-xs text-slate-500">
-              Tidak ada {`meta.label`.toLowerCase()} yang cocok dengan filter.
+              {query
+                ? `Tidak ada Mikrotik yang cocok dengan "${query}".`
+                : "Belum ada perangkat Mikrotik terdaftar."}
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {/* 1. UBAH parameter dari (d, i) menjadi (device, i) */}
-            {items.map((device) => (
+            {filtered.map((device) => (
               <Card.Root
                 /* 2. UBAH key agar mengarah ke ID unik device (misal: device.id atau device.uuid) */
                 key={device.id}

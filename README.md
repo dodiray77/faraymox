@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Faraymox
 
-## Getting Started
+Dashboard monitoring infrastruktur untuk perangkat **MikroTik**, **Proxmox**, dan **Docker**. Dibangun dengan Next.js (App Router) dan sebuah custom server Node.js yang sekaligus menjalankan Socket.IO untuk trafik real-time.
 
-First, run the development server:
+## Menjalankan
+
+Proyek ini memakai **pnpm**.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+> **Catatan:** `pnpm dev` menjalankan `node server.js` (bukan `next dev`). Server kustom ini melayani Next.js **dan** Socket.IO pada port yang sama (`PORT`, default `3000`).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Build & produksi:
 
-## Learn More
+```bash
+pnpm build
+pnpm start
+```
 
-To learn more about Next.js, take a look at the following resources:
+Lint:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+pnpm lint
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Tidak ada script test/typecheck di repo ini.
 
-## Deploy on Vercel
+## Konfigurasi
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Buat file `.env` di root (tidak di-commit):
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```env
+APP_NAME=faraymox
+HOST=0.0.0.0
+PORT=3000
+NODE_ENV=development
+MOCK=false
+DATABASE_URL="file:./db/dev.db"
+```
+
+- Set `MOCK=true` untuk menjalankan UI dengan data contoh tanpa perangkat/host asli.
+- Variabel opsional untuk integrasi nyata: `MIKROTIK_HOST`, `PROXMOX_HOST`, `PROXMOX_TOKEN`, `DOCKER_HOST`.
+
+## Database
+
+SQLite via Prisma 7 dengan driver adapter `better-sqlite3`.
+
+- Config Prisma: **`prisma7.config.ts`** (penamaan default Prisma 7).
+- Schema: `prisma/schema.prisma`; migrasi di `prisma/migrations`.
+- Client hasil generate berada di `src/generated/prisma` dan **di-gitignore** — jangan mengeditnya langsung.
+
+```bash
+pnpm exec prisma migrate dev
+pnpm exec prisma generate
+```
+
+## Struktur singkat
+
+- `server.js` — custom server: Next request handler + Socket.IO. Client join room `traffic:<deviceId>:<interface>`, server polling MikroTik tiap 2 detik lalu emit `traffic-update`.
+- `src/app/(dashboard)/` — halaman UI: `/`, `/mikrotik`, `/mikrotik/[id]`, `/proxmox`, `/docker`.
+- `src/app/api/` — route handler: `/api`, `/api/mikrotik`, `/api/proxmox`, `/api/docker`.
+- `src/lib/` — layer data/service (Prisma, koneksi MikroTik, Docker, Proxmox).
+- `src/data/device.js` — data perangkat contoh + helper routing.
+
+UI dan komentar kode menggunakan Bahasa Indonesia.

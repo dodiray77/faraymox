@@ -204,24 +204,26 @@ export default function Dashboard() {
     refreshInterval: 30000,
   });
   const devices = useMemo(() => data?.data || [], [data]);
-  const counts = useMemo(
-    () => ({
+  const counts = useMemo(() => {
+    const isOnline = (d) => d.online === true || d.status === "online";
+    return {
       total: devices.length,
+      online: devices.filter(isOnline).length,
+      offline: devices.filter((d) => !isOnline(d)).length,
       router: devices.filter((d) => d.type === "router").length,
       proxmox: devices.filter((d) => d.type === "proxmox").length,
       docker: devices.filter((d) => d.type === "docker").length,
-    }),
-    [devices],
-  );
+    };
+  }, [devices]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return devices.filter((d) => {
       if (tab !== "all" && d.type !== tab) return false;
       if (!q) return true;
-      return [d.name, d.ip, d.mac, d.model, d.location, d.version]
+      return [d.name, d.identity, d.ip, d.host, d.mac, d.model, d.location, d.version]
         .filter(Boolean)
-        .some((v) => v.toLowerCase().includes(q));
+        .some((v) => String(v).toLowerCase().includes(q));
     });
   }, [devices, query, tab]);
 
