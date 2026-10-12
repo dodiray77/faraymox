@@ -1,6 +1,6 @@
 "use client";
 import { Desktop, Search, Server, Sitemap, Times } from "@primeicons/react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { DEVICE_TYPES, getDeviceHref } from "@/data/device";
 import { Card } from "@primereact/ui/card";
@@ -8,7 +8,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import useSWR from "swr";
 const fetcher = (u) => fetch(u).then((r) => r.json());
 const GROUP_STYLE = {
-  router: {
+  mikrotik: {
     icon: Sitemap,
     tone: "from-emerald-400 to-teal-600 shadow-emerald-500/30",
   },
@@ -23,7 +23,7 @@ const GROUP_STYLE = {
 };
 
 function StatusBadge({ status }) {
-  const online = status === "online";
+  const online = status === "online" || status === true;
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold leading-none ${
@@ -40,7 +40,22 @@ function StatusBadge({ status }) {
   );
 }
 
-function DeviceCard({ device, delay = "" }) {
+function DeviceCard({ data, delay = "" }) {
+  const {
+    data: deviceData,
+    isLoading,
+    error,
+  } = useSWR(
+    data.id
+      ? `/api/mikrotik?id=${encodeURIComponent(data.id)}&resource=resource`
+      : null,
+    fetcher,
+  );
+  const device = {
+    ...data,
+    ...(deviceData?.data?.[0] || {}),
+  };
+  console.log(device);
   const style = GROUP_STYLE[device.type] ?? GROUP_STYLE.docker;
   const Icon = style.icon;
   const router = useRouter();
@@ -65,7 +80,7 @@ function DeviceCard({ device, delay = "" }) {
             >
               <Icon />
             </div>
-            <StatusBadge status={device.status} />
+            <StatusBadge status={device.online} />
           </div>
         </Card.Caption>
         <Card.Content className="flex-1">
@@ -79,7 +94,7 @@ function DeviceCard({ device, delay = "" }) {
             <div className="flex items-center justify-between gap-2">
               <span className="text-slate-500">IP</span>
               <span className="font-semibold tracking-tight text-slate-200">
-                {device.ip}
+                {device.host}
               </span>
             </div>
             <div className="flex items-center justify-between gap-2">
@@ -154,7 +169,7 @@ function GroupSection({ type, items }) {
           {items.map((d, i) => (
             <DeviceCard
               key={d.id}
-              device={d}
+              data={d}
               delay={
                 i % 3 === 0
                   ? "stagger-1"
@@ -204,24 +219,38 @@ export default function Dashboard() {
     refreshInterval: 30000,
   });
   const devices = useMemo(() => data?.data || [], [data]);
+  const isOnline = (d) => d.online === true;
   const counts = useMemo(() => {
-    const isOnline = (d) => d.online === true || d.status === "online";
     return {
       total: devices.length,
       online: devices.filter(isOnline).length,
       offline: devices.filter((d) => !isOnline(d)).length,
-      router: devices.filter((d) => d.type === "router").length,
-      proxmox: devices.filter((d) => d.type === "proxmox").length,
-      docker: devices.filter((d) => d.type === "docker").length,
+      mikrotik: devices.filter(
+        (d) => d.category?.name.toUpperCase() === "MIKROTIK",
+      ).length,
+      proxmox: devices.filter(
+        (d) => d.category?.name.toUpperCase() === "PROXMOX",
+      ).length,
+      docker: devices.filter((d) => d.category?.name.toUpperCase() === "DOCKER")
+        .length,
     };
   }, [devices]);
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return devices.filter((d) => {
-      if (tab !== "all" && d.type !== tab) return false;
+      if (tab !== "all" && d.category?.name.toUpperCase() !== tab.toUpperCase())
+        return false;
       if (!q) return true;
-      return [d.name, d.identity, d.ip, d.host, d.mac, d.model, d.location, d.version]
+      return [
+        d.name,
+        d.identity,
+        d.ip,
+        d.host,
+        d.mac,
+        d.model,
+        d.location,
+        d.version,
+      ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
@@ -229,16 +258,22 @@ export default function Dashboard() {
 
   const groups = useMemo(
     () => ({
-      router: filtered.filter((d) => d.type === "router"),
-      proxmox: filtered.filter((d) => d.type === "proxmox"),
-      docker: filtered.filter((d) => d.type === "docker"),
+      mikrotik: filtered.filter(
+        (d) => d.category?.name.toUpperCase() === "MIKROTIK",
+      ),
+      proxmox: filtered.filter(
+        (d) => d.category?.name.toUpperCase() === "PROXMOX",
+      ),
+      docker: filtered.filter(
+        (d) => d.category?.name.toUpperCase() === "DOCKER",
+      ),
     }),
     [filtered],
   );
 
   const tabs = [
     { value: "all", label: `Semua`, count: counts.total },
-    { value: "router", label: `Router`, count: counts.router },
+    { value: "mikrotik", label: `Mikrotik`, count: counts.mikrotik },
     { value: "proxmox", label: `Proxmox`, count: counts.proxmox },
     { value: "docker", label: `Docker`, count: counts.docker },
   ];
@@ -263,7 +298,7 @@ export default function Dashboard() {
               )}
             </div>
             <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-slate-400">
-              3 grup: Router MikroTik · Proxmox / VM · Docker. Klik kartu untuk
+              3 grup: Router MIKROTIK · Proxmox / VM · Docker. Klik kartu untuk
               buka halaman sesuai jenis.
             </p>
           </div>
@@ -309,7 +344,7 @@ export default function Dashboard() {
                   ? `${counts.offline} offline`
                   : s.key === "total"
                     ? "terinventaris"
-                    : `${devices.filter((d) => d.type === s.key && d.status === "online").length} online`}
+                    : `${devices.filter((d) => d.category?.name.toUpperCase() === s.key && d.status === "online").length} online`}
               </p>
             </div>
           );
@@ -364,8 +399,8 @@ export default function Dashboard() {
       </div>
 
       <div className="space-y-8">
-        {(tab === "all" || tab === "router") && (
-          <GroupSection type="router" items={groups.router} />
+        {(tab === "all" || tab === "mikrotik") && (
+          <GroupSection type="mikrotik" items={groups.mikrotik} />
         )}
         {(tab === "all" || tab === "proxmox") && (
           <GroupSection type="proxmox" items={groups.proxmox} />
@@ -376,7 +411,7 @@ export default function Dashboard() {
       </div>
 
       <p className="pb-2 text-center text-[11px] font-medium tracking-wide text-slate-600">
-        3 grup aktif · Klik Router → /mikrotik · Proxmox/VM → /proxmox · Docker
+        3 grup aktif · Klik Router → /MIKROTIK · Proxmox/VM → /proxmox · Docker
         → /docker
       </p>
     </div>

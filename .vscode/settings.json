@@ -1,0 +1,25 @@
+{
+  "sqltools.connections": [
+    {
+      "mssqlOptions": {
+        "appName": "SQLTools",
+        "useUTC": true,
+        "encrypt": true
+      },
+      "previewLimit": 50,
+      "server": "127.0.0.1\\SQLEXPRESS",
+      "port": 1433,
+      "askForPassword": true,
+      "driver": "MSSQL",
+      "name": "local",
+      "username": "sa",
+      "database": "SIMBADA"
+    },
+    {
+      "previewLimit": 50,
+      "driver": "SQLite",
+      "name": "faraymox",
+      "database": "${workspaceFolder:faraydox}/db/dev.db"
+    }
+  ]
+}

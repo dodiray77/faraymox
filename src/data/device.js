@@ -1,7 +1,7 @@
 export const DEVICE_TYPES = {
-  router: {
-    value: "router",
-    label: "Router",
+  mikrotik: {
+    value: "mikrotik",
+    label: "Mikrotik",
     desc: "Device MikroTik",
     href: "/mikrotik",
   },

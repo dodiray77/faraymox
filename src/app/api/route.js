@@ -20,6 +20,25 @@ export async function GET(req) {
         break;
       default:
         rawData = await DeviceService.getDevices();
+        rawData = await Promise.all(
+          rawData.map(async (device) => {
+            try {
+              const online = await MikrotikService.checkOnline(
+                device.host || device.ip,
+              );
+
+              return {
+                ...device,
+                online,
+              };
+            } catch {
+              return {
+                ...device,
+                online: false,
+              };
+            }
+          }),
+        );
         break;
     }
     const data = rawData;

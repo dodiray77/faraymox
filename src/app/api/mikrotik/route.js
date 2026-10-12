@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { connectMikrotik, mockInterfaces } from "@/lib/mikrotik";
+import { connectMikrotik, getRouterOS, mockInterfaces } from "@/lib/mikrotik";
 import { isMock } from "@/lib/config";
 import { MikrotikService } from "@/lib/services/mikrotik.service";
 
@@ -34,13 +34,21 @@ export async function GET(req) {
     // 2. Hubungkan ke MikroTik. Fungsi ini mereturn { client, deviceKey }
     // Jika koneksi sudah ada di Map, proses ini instan & memakai koneksi lama!
     const { client: router } = await connectMikrotik(device);
+    const auth = Buffer.from(`${device.username}:${device.password}`).toString(
+      "base64",
+    );
     let rawData;
     switch (resource) {
       case "interfaces":
         rawData = await router.write("/interface/print");
         break;
       default:
-        rawData = await router.write("/system/resource/print");
+        rawData = await getRouterOS({
+          host: `${device.host}:${device.port}`,
+          username: device.username,
+          password: device.password,
+          path: "/system/resource",
+        });
         break;
     }
     return NextResponse.json({ success: true, data: rawData });

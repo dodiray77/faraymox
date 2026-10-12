@@ -170,3 +170,32 @@ export async function getInterfaceTraffic(deviceOrId, interfaceName) {
     return null;
   }
 }
+
+export async function getRouterOS({ host, username, password, path }) {
+  const baseUrl = `http://${host}/rest`;
+  const url = `${baseUrl}${path}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { username, password, Accept: "application/json" },
+      signal: AbortSignal.timeout(10000),
+      cache: "no-store",
+    });
+
+    console.log("RouterOS URL:", url);
+    console.log("RouterOS status:", response.status);
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`RouterOS REST API error: ${response.status} - ${body}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("RouterOS connection error:", error);
+    console.error("Underlying cause:", error.cause);
+
+    throw error;
+  }
+}
