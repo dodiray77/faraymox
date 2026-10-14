@@ -171,14 +171,17 @@ export async function getInterfaceTraffic(deviceOrId, interfaceName) {
   }
 }
 
-export async function getRouterOS({ host, username, password, path }) {
+export async function getRouterOS({ host, auth, path }) {
   const baseUrl = `http://${host}/rest`;
   const url = `${baseUrl}${path}`;
-
+  console.log(auth);
   try {
     const response = await fetch(url, {
       method: "GET",
-      headers: { username, password, Accept: "application/json" },
+      headers: {
+        Authorization: `Basic ${auth}`,
+        Accept: "application/json",
+      },
       signal: AbortSignal.timeout(10000),
       cache: "no-store",
     });

@@ -33,20 +33,24 @@ export async function GET(req) {
 
     // 2. Hubungkan ke MikroTik. Fungsi ini mereturn { client, deviceKey }
     // Jika koneksi sudah ada di Map, proses ini instan & memakai koneksi lama!
-    const { client: router } = await connectMikrotik(device);
-    const auth = Buffer.from(`${device.username}:${device.password}`).toString(
-      "base64",
-    );
+    const username = device.username;
+    const password = device.password;
+
+    // ENKRIPSI YANG BENAR DI BACKEND/NODE.JS
+    const authToken = Buffer.from(`${username}:${password}`).toString("base64");
     let rawData;
     switch (resource) {
       case "interfaces":
-        rawData = await router.write("/interface/print");
+        rawData = await getRouterOS({
+          host: `${device.host}:${device.port}`,
+          auth: authToken,
+          path: "/interface",
+        });
         break;
       default:
         rawData = await getRouterOS({
           host: `${device.host}:${device.port}`,
-          username: device.username,
-          password: device.password,
+          auth: authToken,
           path: "/system/resource",
         });
         break;

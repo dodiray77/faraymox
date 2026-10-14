@@ -41,19 +41,18 @@ function StatusBadge({ status }) {
 }
 
 function DeviceCard({ data, delay = "" }) {
+  const shouldFetch = data.online && data.id;
   const {
     data: deviceData,
     isLoading,
     error,
   } = useSWR(
-    data.id
-      ? `/api/mikrotik?id=${encodeURIComponent(data.id)}&resource=resource`
-      : null,
+    shouldFetch ? `/api/mikrotik?id=${encodeURIComponent(data.id)}` : null,
     fetcher,
   );
   const device = {
     ...data,
-    ...(deviceData?.data?.[0] || {}),
+    ...(deviceData?.data || {}),
   };
   console.log(device);
   const style = GROUP_STYLE[device.type] ?? GROUP_STYLE.docker;
