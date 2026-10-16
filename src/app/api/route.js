@@ -3,6 +3,7 @@ import { isMock } from "@/lib/config";
 import { DEVICES } from "@/data/device";
 import { DeviceService } from "@/lib/services/device.service";
 import { MikrotikService } from "@/lib/services/mikrotik.service";
+import { checkOnline } from "@/lib/mikrotik";
 export const dynamic = "force-dynamic";
 
 export async function GET(req) {
@@ -23,10 +24,7 @@ export async function GET(req) {
         rawData = await Promise.all(
           rawData.map(async (device) => {
             try {
-              const online = await MikrotikService.checkOnline(
-                device.host || device.ip,
-              );
-
+              const online = await checkOnline(device.host || device.ip);
               return {
                 ...device,
                 online,

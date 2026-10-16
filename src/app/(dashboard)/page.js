@@ -54,7 +54,6 @@ function DeviceCard({ data, delay = "" }) {
     ...data,
     ...(deviceData?.data || {}),
   };
-  console.log(device);
   const style = GROUP_STYLE[device.type] ?? GROUP_STYLE.docker;
   const Icon = style.icon;
   const router = useRouter();

@@ -1,6 +1,10 @@
-import prisma from "@/lib/prisma";
-import ping from "ping";
-import { connectMikrotik, dropConnection } from "@/lib/mikrotik";
+import prisma from "../../lib/prisma.js";
+
+import {
+  checkOnline,
+  connectMikrotik,
+  dropConnection,
+} from "../../lib/mikrotik.js";
 export const MikrotikService = {
   async createMikrotik(data) {
     return await prisma.device.create({
@@ -12,13 +16,6 @@ export const MikrotikService = {
     const existing = await prisma.category.findUnique({ where: { name } });
     if (existing) return existing;
     return prisma.category.create({ data: { name } });
-  },
-  async checkOnline(host) {
-    const result = await ping.promise.probe(host, {
-      timeout: 2,
-      min_reply: 1,
-    });
-    return result.alive;
   },
   async getDevicesMikrotik() {
     const devices = await prisma.device.findMany({
@@ -34,7 +31,7 @@ export const MikrotikService = {
     return await Promise.all(devices.map((device) => this.getIdentity(device)));
   },
   async getIdentity(device) {
-    const isOnline = await this.checkOnline(device.host);
+    const isOnline = await checkOnline(device.host);
     if (!isOnline) {
       return {
         ...device,

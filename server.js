@@ -1,14 +1,12 @@
 import { createServer } from "node:http";
 import next from "next";
 import { Server } from "socket.io";
-// Import connectMikrotik untuk menukar objek DB menjadi deviceKey aman
 import { connectMikrotik, getInterfaceTraffic } from "./src/lib/mikrotik.js";
-import { env } from "./src/app/config/env.js";
 // import { MikrotikService } from "@/lib/services/mikrotik.service.js"; // Aktifkan jika sudah beres path alias-nya
 
-const dev = env.nodeEnv !== "production";
-const hostname = env.host;
-const port = env.port;
+const dev = process.env.NODE_ENV !== "production";
+const hostname = process.env.HOST;
+const port = process.env.PORT;
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 
@@ -37,13 +35,8 @@ app.prepare().then(() => {
           stopPolling(trackingKey);
           return;
         }
-
         try {
-          // JIKA interval sedang berjalan, kita cukup kirim string 'deviceId' saja (Aman)
-          // KECUALI di awal (first hit) fungsi ini dikirimi objek 'deviceData' lengkap dari DB
-          const paramToCall = deviceId;
-
-          const data = await getInterfaceTraffic(paramToCall, interfaceId);
+          const data = await getInterfaceTraffic(deviceId, interfaceId);
           io.to(roomName).emit("traffic-update", data);
         } catch (error) {
           console.error(`Gagal broadcast ${trackingKey}:`, error.message);

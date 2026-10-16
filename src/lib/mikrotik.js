@@ -1,5 +1,6 @@
 import { RouterOSAPI } from "routeros-client";
-
+import ping from "ping";
+import { MikrotikService } from "./services/mikrotik.service.js";
 export const mockInterfaces = [
   {
     name: "ether1",
@@ -23,10 +24,10 @@ export const mockInterfaces = [
     tx: "0",
   },
 ];
-
 if (!globalThis._mikrotikConnections) {
   globalThis._mikrotikConnections = new Map();
 }
+const CACHE_TTL = 60 * 60 * 1000;
 const connections = globalThis._mikrotikConnections;
 const logState = new Map();
 
@@ -139,47 +140,57 @@ export async function connectMikrotik(device) {
 /**
  * Fungsi pemanggilan trafik yang sekarang cukup dioperi string deviceId database
  */
-export async function getInterfaceTraffic(deviceOrId, interfaceName) {
-  try {
-    let routerClient;
 
-    // Jika yang dikirim berupa string (deviceId murni), kita cek langsung ke Map connections
-    if (typeof deviceOrId === "string") {
-      if (!connections.has(deviceOrId)) {
-        throw new Error(
-          `Koneksi aktif untuk Device ID [${deviceOrId}] tidak ditemukan.`,
-        );
-      }
-      routerClient = connections.get(deviceOrId);
-    } else {
-      // Jika yang dikirim berupa objek device lengkap dari DB, biarkan fungsi connectMikrotik mengaturnya
-      const { client } = await connectMikrotik(deviceOrId);
-      routerClient = client;
+export async function getRouterOS({ id, path }) {
+  if (!id) {
+    throw new Error(
+      "ID perangkat wajib disertakan untuk mengambil data RouterOS.",
+    );
+  }
+
+  try {
+    const now = Date.now();
+    let cachedDevice = globalThis._mikrotikConnections.get(id);
+
+    // 1. LOGIKA CACHE CHECK: Jika belum ada atau expired, ambil data baru dari database
+    if (!cachedDevice || now - cachedDevice.cachedAt > CACHE_TTL) {
+      console.log(
+        `[DB HIT - getRouterOS] Mengambil kredensial baru untuk Device ID: [${id}]`,
+      );
+
+      const device = await MikrotikService.getDeviceById(id);
+      if (!device) throw new Error("Device tidak ditemukan di database.");
+
+      const username = device.username;
+      const password = device.password;
+      const authToken = Buffer.from(`${username}:${password}`).toString(
+        "base64",
+      );
+
+      const hostParam = device.port
+        ? `${device.host}:${device.port}`
+        : device.host;
+      const baseUrl = hostParam.startsWith("http")
+        ? hostParam
+        : `http://${hostParam}`;
+
+      cachedDevice = {
+        authToken,
+        baseUrl: `${baseUrl}/rest`, // Simpan base URL rest-nya saja
+        hostLog: device.host,
+        cachedAt: now,
+      };
+
+      globalThis._mikrotikConnections.set(id, cachedDevice);
     }
 
-    const data = await routerClient.write("/interface/monitor-traffic", [
-      `=interface=${interfaceName}`,
-      "=once=",
-    ]);
+    // 2. KONEKSI REST API: Susun URL akhir berdasarkan path yang diminta
+    const url = `${cachedDevice.baseUrl}${path}`;
 
-    return data?.[0] ?? null;
-  } catch (error) {
-    const idLog =
-      typeof deviceOrId === "string" ? deviceOrId : deviceOrId?.id || "unknown";
-    console.error(`[Traffic Error] Device ID [${idLog}]:`, error.message);
-    return null;
-  }
-}
-
-export async function getRouterOS({ host, auth, path }) {
-  const baseUrl = `http://${host}/rest`;
-  const url = `${baseUrl}${path}`;
-  console.log(auth);
-  try {
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        Authorization: `Basic ${auth}`,
+        Authorization: `Basic ${cachedDevice.authToken}`,
         Accept: "application/json",
       },
       signal: AbortSignal.timeout(10000),
@@ -191,14 +202,106 @@ export async function getRouterOS({ host, auth, path }) {
 
     if (!response.ok) {
       const body = await response.text();
+
+      // Jika password di Router telah diubah (401), hapus cache agar request berikutnya me-refresh DB
+      if (response.status === 401) {
+        globalThis._mikrotikConnections.delete(id);
+      }
+
       throw new Error(`RouterOS REST API error: ${response.status} - ${body}`);
     }
 
     return await response.json();
   } catch (error) {
-    console.error("RouterOS connection error:", error);
-    console.error("Underlying cause:", error.cause);
-
+    console.error("RouterOS connection error:", error.message);
     throw error;
   }
+}
+
+export async function getInterfaceTraffic(id, interfaceName) {
+  try {
+    if (!id) {
+      throw new Error("ID wajib disertakan untuk REST API");
+    }
+    const now = Date.now();
+    // Mengambil cache dari properti globalThis milik Anda
+    let cachedDevice = globalThis._mikrotikConnections.get(id);
+
+    // LOGIKA CACHE CHECK: Jika belum ada atau masa simpan habis, buat auth baru dari DB
+    if (!cachedDevice || now - cachedDevice.cachedAt > CACHE_TTL) {
+      console.log(
+        `[DB HIT] Mengambil/Memperbarui kredensial REST untuk Device ID: [${id}]`,
+      );
+
+      const device = await MikrotikService.getDeviceById(id);
+      if (!device) throw new Error("Device tidak ditemukan di database.");
+
+      const username = device.username;
+      const password = device.password;
+
+      // Enkripsi Basic Auth di backend Node.js
+      const authToken = Buffer.from(`${username}:${password}`).toString(
+        "base64",
+      );
+
+      const hostParam = device.port
+        ? `${device.host}:${device.port}`
+        : device.host;
+      const baseUrl = hostParam.startsWith("http")
+        ? hostParam
+        : `http://${hostParam}`;
+
+      // Susun objek data auth untuk disimpan global
+      cachedDevice = {
+        authToken,
+        url: `${baseUrl}/rest/interface/monitor-traffic`,
+        hostLog: device.host,
+        cachedAt: now,
+      };
+
+      // Simpan ke dalam Map Global yang sudah Anda siapkan
+      globalThis._mikrotikConnections.set(id, cachedDevice);
+    }
+
+    // Tentukan host beserta port REST API (Contoh format: 192.168.88.1:80 atau jika kosong langsung host-nya)
+    const response = await fetch(cachedDevice.url, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${cachedDevice.authToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        interface: interfaceName,
+        once: true,
+      }),
+      signal: AbortSignal.timeout(4000),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Status ${response.status}: ${errorBody}`);
+    }
+
+    const data = await response.json();
+
+    // Kembalikan objek data pertama seperti perilaku library sebelumnya
+    return data?.[0] ?? null;
+  } catch (error) {
+    const deviceLog = id || "unknown-device";
+    console.error(
+      `[Traffic Error REST] Device [${deviceLog}] Interface [${interfaceName}]:`,
+      error.message,
+    );
+    return null;
+  }
+}
+
+export async function checkOnline(host) {
+  const result = await ping.promise.probe(host, {
+    timeout: 2,
+    min_reply: 1,
+  });
+  return result.alive;
 }

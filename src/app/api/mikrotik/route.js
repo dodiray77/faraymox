@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { connectMikrotik, getRouterOS, mockInterfaces } from "@/lib/mikrotik";
+import {
+  checkOnline,
+  connectMikrotik,
+  getRouterOS,
+  mockInterfaces,
+} from "@/lib/mikrotik";
 import { isMock } from "@/lib/config";
 import { MikrotikService } from "@/lib/services/mikrotik.service";
 
@@ -30,29 +35,26 @@ export async function GET(req) {
         { status: 404 },
       );
     }
-
-    // 2. Hubungkan ke MikroTik. Fungsi ini mereturn { client, deviceKey }
-    // Jika koneksi sudah ada di Map, proses ini instan & memakai koneksi lama!
-    const username = device.username;
-    const password = device.password;
-
-    // ENKRIPSI YANG BENAR DI BACKEND/NODE.JS
-    const authToken = Buffer.from(`${username}:${password}`).toString("base64");
     let rawData;
     switch (resource) {
       case "interfaces":
         rawData = await getRouterOS({
-          host: `${device.host}:${device.port}`,
-          auth: authToken,
+          id,
           path: "/interface",
         });
         break;
       default:
-        rawData = await getRouterOS({
-          host: `${device.host}:${device.port}`,
-          auth: authToken,
+        const dataResource = await getRouterOS({
+          id,
           path: "/system/resource",
         });
+        const isDeviceOnline = await checkOnline(device.host);
+
+        // 3. Gabungkan hasilnya ke dalam satu objek secara valid
+        rawData = {
+          ...dataResource,
+          isConnected: isDeviceOnline, // Properti baru langsung dimasukkan di sini
+        };
         break;
     }
     return NextResponse.json({ success: true, data: rawData });
